@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>단어 순서 배열 프로그램 (모바일 최적화 & 되돌리기)</title>
+    <style>
+        /* 🌟 색상 팔레트 및 배경: Arctic Ice 적용 */
+        :root {
+            --primary-color: #007BFF; /* 진한 파랑 (되돌리기, 채점하기, 다음 버튼) */
+            --success-color: #28A745; /* 녹색 */
+            --danger-color: #DC3545; /* 빨간색 (삭제) */
+            --warning-color: #FFC107; /* 노란색 */
+            --light-primary-color: #4C99FF; /* 사용자 요청: 파란색 + 흰색 (오답 학습 버튼) */
+            --arctic-ice-bg: #F0F8FF; /* Arctic Ice 계열 배경 */
+            --container-bg: #FFFFFF;
+            --text-color: #343A40;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--arctic-ice-bg);
+            margin: 0; 
+            padding: 15px; 
+            display: flex; 
+            justify-content: center; 
+            align-items: flex-start; 
+            min-height: 100vh;
+            color: var(--text-color);
+        }
+        .container {
+            width: 100%; 
+            max-width: 700px;
+            background-color: var(--container-bg);
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+        }
+        .screen { padding: 20px; }
+        .hidden { display: none; }
+        h1, h2 { text-align: center; color: var(--primary-color); margin-bottom: 20px; font-size: 1.5em; }
+
+        /* 버튼 디자인 (모바일 터치 최적화) */
+        .btn {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-left: 5px; 
+            white-space: nowrap; /* 버튼 내부 텍스트 줄바꿈 방지 */
+        }
+        /* 푸른 계열 버튼 통일 */
+        .btn-primary, #check-btn, #undo-btn { 
+            background-color: var(--primary-color); 
+            color: white; 
+        }
+        .btn-success { background-color: var(--success-color); color: white; }
+        .btn-danger { background-color: var(--danger-color); color: white; }
+        .btn-warning { background-color: var(--warning-color); color: var(--text-color); }
+        /* 🌟 NEW: 오답 학습 버튼 스타일 */
+        .btn-light-primary { 
+            background-color: var(--light-primary-color); 
+            color: white; 
+        }
+        .btn:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 10px rgba(0, 0, 0, 0.15);
+        }
+        .btn:disabled { 
+            background-color: #ccc; 
+            cursor: not-allowed; 
+            transform: none; 
+            box-shadow: none; 
+        }
+        
+        /* 학습 화면 스타일 */
+        #meaning-display { font-size: 1.2em; font-weight: bold; text-align: center; margin: 20px 0; padding: 12px; background-color: #FFFDE7; border-radius: 8px; border: 1px dashed #FFC107; }
+        .controls { margin-top: 25px; display: flex; flex-direction: column; gap: 10px; }
+        #action-buttons { display: flex; justify-content: space-around; width: 100%; margin-top: 5px; }
+        .feedback { text-align: center; font-size: 1.2em; font-weight: bold; margin-top: 15px; padding: 8px; border-radius: 8px; }
+
+        /* 순서 배열 프로그램 전용 스타일 */
+        #arrangement-area {
+            min-height: 70px;
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            align-content: flex-start;
+            gap: 6px; 
+            background-color: #F8F8FF;
+        }
+        .arranged-word {
+            display: inline-block;
+            padding: 6px 10px;
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.9em;
+        }
+        #word-bank {
+            text-align: center;
+            padding: 10px 0;
+            border-top: 1px solid #eee;
+        }
+        .word-btn {
+            padding: 8px 12px; 
+            border: 1px solid var(--primary-color);
+            background-color: white;
+            color: var(--primary-color);
+            border-radius: 20px;
+            cursor: pointer;
+            margin: 4px; 
+            font-size: 0.9em;
+            display: inline-block;
+        }
+        /* 선택된 단어(비활성화된 word-btn)를 회색으로 표시 */
+        .word-btn:disabled {
+            border: 1px solid #ADB5BD; 
+            background-color: #EEEEEE; 
+            color: #6C757D; 
+            cursor: not-allowed;
+            opacity: 1;
+        }
+        /* 기타 기존 스타일 유지 */
+        #main-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;}
+        #set-list { list-style: none; padding: 0; }
+        .set-item { flex-direction: column; align-items: flex-start; padding: 15px; border: 1px solid #ddd; border-radius: 10px; margin-bottom: 10px; background-color: #F8F9FA; transition: background-color 0.2s; }
+        .set-item:hover { background-color: #E9ECEF; }
+        .set-item-title { font-size: 1.1em; margin-bottom: 10px; } 
+        .set-item-controls { width: 100%; display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 5px;} /* 버튼들이 줄바꿈되도록 flex-wrap 추가 */
+        .input-group input, #sentence-inputs-container .sentence-pair input { padding: 10px; width: 100%; border: 1px solid #ced4da; border-radius: 8px; box-sizing: border-box; }
+        #sentence-inputs-container .sentence-pair { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+        .form-controls { display: flex; justify-content: space-between; margin-top: 20px; }
+        .report-sentence { margin-bottom: 5px; font-weight: bold; }
+        .report-count { color: var(--danger-color); font-size: 0.9em; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div id="main-screen" class="screen">
+            <div id="main-header">
+                <h1>📝 순서 배열 학습 세트</h1>
+                <button id="add-set-btn" class="btn btn-primary">+</button>
+            </div>
+            <ul id="set-list"></ul>
+        </div>
+
+        <div id="create-set-screen" class="screen hidden">
+            <h2>새로운 세트 만들기</h2>
+            <div class="input-group">
+                <label for="set-title-input">세트 제목</label>
+                <input type="text" id="set-title-input" placeholder="예: 여행 영어 회화">
+            </div>
+            <h3>문장과 뜻 추가</h3>
+            <div id="sentence-inputs-container"></div>
+            <button id="add-sentence-field-btn" class="btn btn-primary" style="margin-top: 10px;">+ 문장 추가</button>
+            <div class="form-controls">
+                <button class="back-to-main-btn btn">뒤로</button>
+                <button id="save-set-btn" class="btn btn-success">저장하기</button>
+            </div>
+        </div>
+
+        <div id="learning-screen" class="screen hidden">
+            <h2 id="learning-set-title"></h2>
+            <p id="progress-display" style="text-align: center; color: var(--primary-color);"></p>
+            
+            <p id="meaning-display"></p>
+            
+            <div id="arrangement-container">
+                <div id="arrangement-area"></div>
+            </div>
+
+            <div id="word-bank"></div>
+
+            <div class="controls">
+                <button class="back-to-main-btn btn">메인으로</button>
+                <div id="action-buttons">
+                    <button id="undo-btn" class="btn btn-primary">되돌리기</button> 
+                    <button id="check-btn" class="btn btn-primary">채점하기</button>
+                    <button id="show-answer-btn" class="btn btn-primary hidden">정답 보기</button> 
+                    <button id="next-question-btn" class="btn btn-primary hidden">다음</button>
+                </div>
+            </div>
+            <div id="feedback-area"></div>
+        </div>
+
+        <div id="report-screen" class="screen hidden">
+            <h2 id="report-title"></h2>
+            <ul id="report-list"></ul>
+            <button class="back-to-main-btn btn" style="margin-top: 20px;">뒤로</button>
+        </div>
+    </div>
+    
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        let sets = [];
+        let currentSetIndex = -1;
+        let currentQuestionIndex = 0;
+        let currentSentenceWords = [];
+        let currentSessionSentences = [];
+
+        const screens = { main: document.getElementById('main-screen'), create: document.getElementById('create-set-screen'), learning: document.getElementById('learning-screen'), report: document.getElementById('report-screen') };
+        const setList = document.getElementById('set-list');
+        const addSetBtn = document.getElementById('add-set-btn');
+        const backToMainBtns = document.querySelectorAll('.back-to-main-btn');
+        const setTitleInput = document.getElementById('set-title-input');
+        const sentenceInputsContainer = document.getElementById('sentence-inputs-container');
+        const addSentenceFieldBtn = document.getElementById('add-sentence-field-btn');
+        const saveSetBtn = document.getElementById('save-set-btn');
+        const learningSetTitle = document.getElementById('learning-set-title');
+        const progressDisplay = document.getElementById('progress-display');
+        const meaningDisplay = document.getElementById('meaning-display');
+        
+        const arrangementArea = document.getElementById('arrangement-area');
+        const wordBank = document.getElementById('word-bank');
+        const undoBtn = document.getElementById('undo-btn'); 
+        const checkBtn = document.getElementById('check-btn');
+        const showAnswerBtn = document.getElementById('show-answer-btn');
+        const nextQuestionBtn = document.getElementById('next-question-btn');
+        const feedbackArea = document.getElementById('feedback-area');
+        
+        const reportTitle = document.getElementById('report-title');
+        const reportList = document.getElementById('report-list');
+
+        let isFirstAttempt = true;
+
+        // 문장 배열에서 마침표, 쉼표 등 구두점을 단어와 분리하여 처리하는 함수
+        function splitSentenceIntoWords(sentence) {
+            const finalPunctuationMatch = sentence.match(/([.,?!])$/);
+            const finalPunctuation = finalPunctuationMatch ? finalPunctuationMatch[1] : '';
+            let cleanedSentence = finalPunctuationMatch ? sentence.slice(0, -finalPunctuationMatch[0].length) : sentence;
+            let words = cleanedSentence.trim().split(/\s+/).filter(word => word.length > 0);
+            if (finalPunctuation) {
+                words.push(finalPunctuation);
+            }
+            return words;
+        }
+
+        // --- 데이터 세트 (이전 버전과 동일) ---
+        const lesson7BodySentences = [
+            { "sentence": "Have you ever visited an online bookstore and been surprised by the books that the store recommended for?", "meaning": "당신은 온라인 서점을 방문하고 그 서점에서 당신을 위해 추천해주는 책에 대해 놀란 적이 있나요?" },
+            { "sentence": "Many of them looked interesting to you.", "meaning": "그것들 중 많은 것들이 당신에게 흥미있어 보였다." },
+            { "sentence": "So how did the bookstore know what you liked?", "meaning": "그러면 어떻게 그 서점들은 당신이 좋아하는 것을 알았을까?" },
+            { "sentence": "This is all possible because of big data.", "meaning": "이것은 모두 빅데이터 때문에 가능하다." },
+            { "sentence": "Big data is data sets that are very big and complex,", "meaning": "빅데이터는 매우 크고 복잡한 데이터 세트이다." },
+            { "sentence": "As information and communication technology develops, the amount of data we have is getting much greater than before.", "meaning": "정보와 통신 기술이 발달함에 따라, 우리가 가지고 있는 데이터의 양은 전보다 훨씬 더 커지고 있다." },
+            { "sentence": "This is mainly because almost everything that we do online leaves a trace.", "meaning": "이것은 주로 우리가 온라인에서 하는 거의 모든 것이 흔적을 남기기 때문이다." },
+            { "sentence": "For example, the photos you upload on your blog and the records of your purchases at online stores are all part of big data.", "meaning": "예를 들어, 당신이 당신의 블로그에 업로드한 사진이나 온라인 상점에서의 당신 구매 기록들은 모두 빅데이터의 부분이다." },
+            { "sentence": "Simply collecting data, however, is not enough.", "meaning": "그러나, 단순히 데이터를 모으는 것은 충분하지 않다." },
+            { "sentence": "Big data has to be analyzed, and this is done by big data experts.", "meaning": "빅데이터는 분석되어져야 하고 이것은 빅데이터 전문가들에 의해 행해진다." },
+            { "sentence": "Using various methods, experts analyze big data and draw meaningful results from it.", "meaning": "다양한 방법들을 사용하면서 전문가들은 빅데이터를 분석하고 그것으로부터 의미 있는 결과들을 끌어낸다." },
+            { "sentence": "These results then can be used to make decisions or to predict the future.", "meaning": "그리고 나서 이런 결과들은 결정을 하거나 미래를 예측하는데 사용되어질 수 있다." },
+            { "sentence": "Big data is influencing almost all parts of our lives.", "meaning": "빅데이터는 우리 삶의 거의 모든 부분에서 영향을 주고 있다." },
+            { "sentence": "It helps companies understand their customers' needs better and helps them sell more products.", "meaning": "그것은 회사들이 고객들의 욕구를 더 잘 이해하고 돕고 그들이 더 많은 물건을 팔도록 돕는다." },
+            { "sentence": "It helps people avoid heavy traffic.", "meaning": "그것은 사람들이 교통 혼잡을 피하도록 돕는다." },
+            { "sentence": "Its uses are endless, and here are some interesting examples.", "meaning": "그것의 이용은 끝이 없고 여기 몇 가지 흥미있는 예들이 있다." },
+            { "sentence": "Did you know that health professionals can now forecast a disease just as weather experts forecast the weather?", "meaning": "너는 날씨 전문가들이 날씨를 예보하는 것처럼 이제 전문가들도 질병을 예견할 수 있다는 것을 알았나요?" },
+            { "sentence": "This is possible thanks to big data.", "meaning": "이것은 빅데이터 덕분에 가능하다." },
+            { "sentence": "For example, when the flu season comes, people will buy more flu medicine.", "meaning": "예를 들어, 독감의 계절이 오면, 사람들은 더 많이 독감 약을 살 것이다." },
+            { "sentence": "They will also search online about flu symptoms more.", "meaning": "그들은 독감 증상에 대해 더 많이 온라인을 검색할 것이다." },
+            { "sentence": "If this kind of data is analyzed wisely, the spread of the flu can be predicted.", "meaning": "만약 이런 종류의 데이터가 현명하게 분석되어 진다면, 독감의 전파는 예측될 수 있다." },
+            { "sentence": "Well, big data is improving the performance of players, making sports more exciting.", "meaning": "자, 빅데이터는 스포츠를 더 재미있게 하면서 선수들의 성과를 향상시키고 있다." },
+            { "sentence": "A famous example is Germany's national soccer team.", "meaning": "유명한 한 예시가 독일 국가대표 축구팀이다." },
+            { "sentence": "The team built a database by collecting and analyzing a huge amount of data on players.", "meaning": "그 팀은 선수들의 아주 많은 양의 데이터를 모으고 분석함으로써 데이터베이스를 만들었다." },
+            { "sentence": "For example, the data included information about how much each player ran and how long he had the ball.", "meaning": "예를 들어, 그 데이터는 각각의 선수가 얼마나 많이 뛰었는지, 얼마나 오래 공을 가지고 있었는지에 대한 정보를 가지고 있다." },
+            { "sentence": "With the help of this database, Germany's national soccer team was able to improve its performance and win the 2014 World Cup.", "meaning": "이런 데이터베이스의 도움으로, 독일 국가대표 축구팀은 팀의 성과를 향상시킬 수 있었고 2014년 월드컵에서 우승할 수 있었다." },
+            { "sentence": "Thanks to big data, police can now predict crime before it happens.", "meaning": "빅데이터 덕분에, 경찰은 이제 범죄가 일어나기 전에 그것을 예측할 수 있다." },
+            { "sentence": "Through the analysis of big data about the type, time and place of crime, police can make a map of crime hot spots.", "meaning": "범죄의 유형, 시간, 장소에 대한 빅데이터 분석을 통해, 경찰은 범죄 다발 지역의 지도를 만들 수 있다." },
+            { "sentence": "This map identifies when and where crime is most likely to happen.", "meaning": "이 지도는 범죄가 언제 그리고 어디서 가장 많이 일어날 것 같은지를 확인한다." },
+            { "sentence": "Police can prevent further crime by focusing on the areas and the times this map predicts.", "meaning": "경찰은 이 지도가 예측하는 그 지역과 그 시간대에 집중함으로써 추가의 범죄를 막을 수 있다." },
+            { "sentence": "Big data has already changed the world greatly.", "meaning": "빅데이터는 이미 세상을 많이 변화시키고 있다." },
+            { "sentence": "Nobody knows for sure, but experts agree that big data will play a more and more important role in our lives.", "meaning": "아무도 확실히 알지는 못하지만 전문가들은 빅데이터가 우리 삶에 점점 더 중요한 역할을 할 것이라는 것에 동의한다." }
+        ];
+
+        const newSetData = {
+            "id": Date.now(),
+            "title": "중3 동아윤 7과 본문 (Living with Big Data)",
+            "sentences": lesson7BodySentences,
+            "report": {}
+        };
+        
+        // 🌟 NEW: 중3 동아윤 8과 본문 데이터 추가
+        const lesson8BodySentences = [
+            { "sentence": "Look at the painting on the right.", "meaning": "오른쪽에 있는 그림을 보라." },
+            { "sentence": "Do you see the Chinese character, hyo(孝)?", "meaning": "한자 효(孝)가 보이는가?" },
+            { "sentence": "Do you also see a carp, a geomungo, and a fan?", "meaning": "잉어, 거문고, 그리고 부채도 보이는가?" },
+            { "sentence": "This kind of painting is called Munjado*, and it is a type of folk painting that was popular in the late Joseon dynasty.", "meaning": "이런 종류의 그림을 문자도라고 하며, 그것은 조선 시대 후기에 인기 있었던 민화의 한 종류이다." },
+            { "sentence": "In Munjado, there is usually a Chinese character with some animals or objects.", "meaning": "문자도에는 보통 한자 하나가 동물이나 사물들과 함께 나온다." },
+            { "sentence": "One of eight Chinese characters appears in Munjado.", "meaning": "문자도에는 여덟 개의 한자 중 하나가 나온다." },
+            { "sentence": "They are hyo(孝), je(悌), chung (忠), sin(信), ye(禮), ui(義), yeom(廉), and chi(恥), and they represent the values that were important to people of the Joseon dynasty.", "meaning": "그것들은 효(孝), 제(悌), 충(忠), 신(信), 예(禮), 의(義), 염(廉), 치(恥)이고, 조선 시대 사람들에게 중요했던 가치들을 나타낸다." },
+            { "sentence": "The animals or objects in Munjado are not just decorations.", "meaning": "문자도에 있는 동물이나 사물은 단순히 장식이 아니다." },
+            { "sentence": "They often are symbolic.", "meaning": "그것들은 종종 상징적이다." },
+            { "sentence": "For example, carp in the paintings of hyo symbolize respect for parents because of an old story.", "meaning": "예를 들어, '효' 그림에 있는 잉어는 한 옛이야기로 인해 부모님에 대한 공경을 상징한다." },
+            { "sentence": "The story goes as follows.", "meaning": "그 이야기는 다음과 같다." },
+            { "sentence": "Once upon a time, a man lived with his old mother.", "meaning": "옛날 옛적에 한 남자가 나이 든 어머니와 살고 있었다." },
+            { "sentence": "One winter, the man’s mother became ill and couldn’t eat anything.", "meaning": "어느 겨울, 남자의 어머니는 병이 들어서 아무 것도 먹을 수 없었다." },
+            { "sentence": "On one very cold day, the mother said to the man,", "meaning": "무척 추운 어느 날, 어머니는 남자에게 말했다." },
+            { "sentence": "“It would be wonderful if I could eat fresh fish.”", "meaning": "“신선한 물고기를 먹을 수 있다면 정말 좋겠구나.”" },
+            { "sentence": "The man went out to the river, but it was completely frozen.", "meaning": "남자는 강으로 나갔지만, 강은 완전히 얼어붙어 있었다." },
+            { "sentence": "It was impossible for him to catch any fish.", "meaning": "그가 어떤 물고기라도 잡는 것은 불가능했다." },
+            { "sentence": "The man was so disappointed that he cried out to the sky, “What should I do?", "meaning": "남자는 몹시 낙담해서 하늘에 대고 외쳤다. “제가 어떻게 해야 하나요?" },
+            { "sentence": "Please help me.” Then the ice melted, and three carp suddenly came out of the water.", "meaning": "제발 저를 도와주세요.” 그러자 얼음이 녹았고, 잉어 세 마리가 갑자기 물 밖으로 나왔다." },
+            { "sentence": "The man went back home and cooked the fish for his mother.", "meaning": "남자는 집으로 돌아가서 어머니에게 그 물고기들을 요리해 드렸다." },
+            { "sentence": "Then his mother got well.", "meaning": "그러자 그의 어머니는 병이 나았다." },
+            { "sentence": "There are other examples of symbolic objects in Munjado.", "meaning": "문자도에 있는 상징적인 사물의 또 다른 예가 있다." },
+            { "sentence": "They are bamboo in the paintings of the character chung(忠) and lotus flowers in the paintings of ui(義).", "meaning": "글자 '충(忠)' 그림에 있는 대나무와 '의(義)' 그림에 있는 연꽃이다." },
+            { "sentence": "Bamboo does not bend.", "meaning": "대나무는 구부러지지 않는다." },
+            { "sentence": "It stays green in all kinds of weather.", "meaning": "그것은 어떤 날씨에서도 푸르름을 유지한다." },
+            { "sentence": "For these reasons, bamboo came to symbolize loyalty to the king.", "meaning": "이런 이유로, 대나무는 왕에 대한 충성심을 상징하게 되었다." },
+            { "sentence": "In the case of lotus flowers, they grow in muddy ponds but still bloom beautifully.", "meaning": "연꽃의 경우, 그것들은 진흙투성이의 연못에서 자라지만 그럼에도 아름답게 꽃을 피운다." },
+            { "sentence": "They thus became a symbol of a person’s will to fight for justice despite difficulties.", "meaning": "그래서 그 꽃들은 어려움에도 불구하고 정의를 위해 싸우는 한 사람의 의지를 상징하게 되었다." },
+            { "sentence": "Munjado was much more than a painting to people of the Joseon dynasty.", "meaning": "문자도는 조선 시대 사람들에게 그림 그 훨씬 이상의 것이었다." },
+            { "sentence": "It reminded them of important values that greatly influenced their behaviors and attitudes.", "meaning": "그것은 그들에게 자신들의 행동과 태도에 큰 영향을 미치는 중요한 가치를 상기시켰다." },
+            { "sentence": "In particular, for children, Munjado was a study tool.", "meaning": "특히 아이들에게 문자도는 학습 도구였다." },
+            { "sentence": "Through it, children in the Joseon dynasty could learn the importance of harmony in family and society.", "meaning": "그것을 통해 조선 시대의 아이들은 가족과 사회에서 조화의 중요성을 배울 수 있었다." }
+        ];
+
+        const newSetData8 = {
+            "id": Date.now() + 1, // 7과와 충돌 방지를 위해 +1
+            "title": "중3 동아윤 8과 본문 (The Joseon Dynasty Through Paintings)",
+            "sentences": lesson8BodySentences,
+            "report": {}
+        };
+        // 🌟 END: 중3 동아윤 8과 본문 데이터 추가
+
+        const defaultData = [
+            { "id": 1, "title": "중3 동아(윤정미) 5과 본문", "sentences": [ { "sentence": "In sports, only the players get a trophy or medal, but they don't win on their own.", "meaning": "스포츠에서는 선수들만 트로피나 메달을 받지만, 그들이 혼자 힘으로 우승하는 것은 아니다." }, { "sentence": "There are people who help the players.", "meaning": "그 선수들을 돕는 사람들이 있다." }, { "sentence": "These people are often hidden and don't get attention.", "meaning": "이 사람들은 종종 숨겨져 있고 주목을 받지 못한다." }, { "sentence": "However, they are as important as the players.", "meaning": "하지만 그들은 선수들만큼 중요하다." }, { "sentence": "Here are some examples.", "meaning": "여기 몇 가지 예가 있다." }, { "sentence": "Pacers run with other runners and lead them in a marathon.", "meaning": "페이서들은 마라톤에서 다른 선수들과 함께 달리며 그들을 이끈다." }, { "sentence": "Pacers are experienced runners, and their job is to help other runners manage their race better.", "meaning": "페이서들은 경험이 많은 선수들이며, 그들의 역할은 다른 선수들이 경주를 더 잘 운영하도록 돕는 것이다." }, { "sentence": "There can be several pacers in a race.", "meaning": "한 경주에는 여러 명의 페이서들이 있을 수 있다." }, { "sentence": "Each pacer runs at different speeds and finishes the race in different times.", "meaning": "각각의 페이서는 다른 속도로 달리고 다른 시간대에 경주를 마친다." }, { "sentence": "Pacers usually have flags or balloons showing their finish time.", "meaning": "페이서들은 보통 자신들의 완주 시간을 나타내는 깃발이나 풍선을 가지고 있다." }, { "sentence": "Runners can choose a pacer depending on their target finish time.", "meaning": "선수들은 자신들의 목표 완주 시간에 따라 페이서를 선택할 수 있다." }, { "sentence": "For example, if a runner wants to finish the race in four hours, the runner will follow the four-hour pacer.", "meaning": "예를 들어, 한 선수가 4시간 안에 경주를 마치고 싶다면, 그 선수는 4시간 페이서를 따라갈 것이다." }, { "sentence": "Since the pacer keeps track of the time, the runner can achieve his or her goal of finishing the marathon in a particular time more easily.", "meaning": "페이서가 시간을 계속해서 파악하기 때문에, 선수는 특정 시간 안에 마라톤을 완주하려는 자신의 목표를 더 쉽게 달성할 수 있다." }, { "sentence": "In short, pacers run but they don't run to win.", "meaning": "요컨대, 페이서들은 달리기는 하지만 우승을 하기 위해 달리는 것은 아니다." }, { "sentence": "They run for others.", "meaning": "그들은 다른 이들을 위해 달린다." }, { "sentence": "You may only see the car and the driver during most car races, but there is a team behind the driver.", "meaning": "여러분은 대부분의 자동차 경주에서 자동차와 레이서만 볼지도 모르겠지만, 그 레이서 뒤에는 팀이 있다." }, { "sentence": "This team is called a pit crew.", "meaning": "이 팀은 피트 크루라고 불린다." }, { "sentence": "A pit is a place on the side of the race track, and drivers stop there several times during a race.", "meaning": "피트는 경주 트랙의 옆에 있는 공간으로, 레이서들이 경주 도중에 그곳에 여러 번 정지한다." }, { "sentence": "The main job of the pit crew is to check the car and change the tires.", "meaning": "피트 크루가 하는 주요 역할은 자동차를 점검하고 타이어를 교체하는 것이다." }, { "sentence": "Changing the tires is especially important because the tires wear out easily in a high speed race.", "meaning": "빠른 속도의 경주에서는 타이어가 쉽게 마모되기 때문에 타이어를 교체하는 것이 특히 중요하다." }, { "sentence": "A pit stop can be as short as 2 seconds, and there are as many as 20 members on a crew.", "meaning": "피트에서의 정지는 짧게는 2초 정도가 될 수 있고, 한 크루에 많게는 20명에 이르는 구성원이 있다." }, { "sentence": "Therefore, the pit crew has to work in perfect harmony.", "meaning": "그러므로 피트 크루는 완벽한 조화를 이루며 일해야 한다." }, { "sentence": "The driver may get all the attention, but as people say, Races are won in the pits.", "meaning": "레이서만 모든 주목을 받을지 모르지만 사람들이 말하는 것처럼, 경주의 우승은 피트에서 이루어진다." }, { "sentence": "The word Sherpa comes from the Sherpa tribe, which lives in the eastern part of Nepal.", "meaning": "Sherpa라는 단어는 셰르파족에서 유래되었는데, 셰르파족은 네팔의 동쪽 지역에 산다." }, { "sentence": "Sherpas have good climbing skills and know their way around the mountains well.", "meaning": "셰르파는 훌륭한 등반 기술을 가졌으며 산의 지리에 밝다." }, { "sentence": "They also have little difficulty breathing high up in the mountains.", "meaning": "그들은 또한 산의 높은 곳에서 호흡하는 데 어려움이 거의 없다." }, { "sentence": "Therefore, mountain climbers started to hire Sherpas to help them climb Mount Everest.", "meaning": "그래서 등산가들은 자신들이 에베레스트산을 등반하는 것을 돕는 셰르파를 고용하기 시작했다." }, { "sentence": "Sherpas lead mountain climbers to the top of the mountain.", "meaning": "셰르파는 등산가들을 산 정상까지 이끈다." }, { "sentence": "They support climbers in many ways.", "meaning": "그들은 여러 방식으로 등산가들을 지원한다." }, { "sentence": "For example, they put up tents and carry climbers' bags.", "meaning": "예를 들어, 그들은 텐트를 치고 등산가들의 가방을 운반한다." }, { "sentence": "Sherpas are often called the invisible people of Mount Everest because people often see a picture of only the climbers at the top of the mountain.", "meaning": "셰르파는 종종 에베레스트산의 보이지 않는 사람들로 불리는데, 왜냐하면 사람들은 흔히 산 정상에서 등산가들만 찍힌 사진을 보기 때문이다." } ], "report": {} },
+            {
+                "id": 2,
+                "title": "추가 대화문",
+                "sentences": [
+                    { "sentence": "How often do you play basketball?", "meaning": "농구 얼마나 자주 해?" },
+                    { "sentence": "I play once a week, but I want to play more often.", "meaning": "일주일에 한 번 하는데, 더 자주 하고 싶어." },
+                    { "sentence": "I suggest you join my basketball club. We play three times a week.", "meaning": "우리 농구 동아리에 가입하는 걸 제안할게. 우리는 일주일에 세 번 해." },
+                    { "sentence": "That sounds good! It’ll be fun to play with you.", "meaning": "좋은 생각이야! 너랑 같이 하면 재미있겠다." },
+                    { "sentence": "I don’t swim often. How about you, Kate? How often do you swim?", "meaning": "나는 수영을 자주 안 해. 너는 어때, Kate? 얼마나 자주 수영해?" },
+                    { "sentence": "I swim four times a week.", "meaning": "나는 일주일에 네 번 수영해." },
+                    { "sentence": "That often? Anyway, it’ll be fun swimming together today.", "meaning": "그렇게 자주? 아무튼, 오늘 같이 수영하면 재미있겠다." },
+                    { "sentence": "Yes, but before we swim, I suggest we do stretching exercises.", "meaning": "응, 하지만 수영하기 전에 스트레칭 운동을 하는 게 좋겠어." },
+                    { "sentence": "That’s a good idea.", "meaning": "좋은 생각이야." },
+                    { "sentence": "Suji, how often do you take bowling lessons?", "meaning": "수지야, 볼링 강습 얼마나 자주 받아?" },
+                    { "sentence": "Twice a week. I’m just a beginner. I heard you’re very good.", "meaning": "일주일에 두 번. 난 이제 막 시작했어. 너는 아주 잘한다고 들었어." },
+                    { "sentence": "Well, I love bowling. Hmm. Your bowling ball looks heavy for you.", "meaning": "음, 나는 볼링을 정말 좋아해. 흠. 네 볼링공이 너한테 무거워 보여." },
+                    { "sentence": "I suggest you use a lighter ball.", "meaning": "더 가벼운 공을 사용하는 걸 제안할게." },
+                    { "sentence": "OK. I’ll look for a lighter one, then.", "meaning": "알겠어. 그럼 더 가벼운 걸 찾아볼게." },
+                    { "sentence": "Mina, how often do you come here to run?", "meaning": "미나야, 여기 얼마나 자주 달리러 와?" },
+                    { "sentence": "Every day.", "meaning": "매일." },
+                    { "sentence": "Can I run with you today?", "meaning": "오늘 너랑 같이 달려도 될까?" },
+                    { "sentence": "Sure, but I suggest you wear running shoes. Your shoes aren’t good for running.", "meaning": "물론이지, 하지만 운동화를 신는 게 좋겠어. 네 신발은 달리기에 적합하지 않아." }
+                ],
+                "report": {}
+            }
+        ];
+
+        function initializeSets(initialData) {
+            const savedData = localStorage.getItem('sentenceArrangementSets');
+            if (savedData) {
+                try {
+                    sets = JSON.parse(savedData);
+                    // 7과 데이터 추가 (기존 로직)
+                    if (!sets.find(set => set.title === newSetData.title)) {
+                        sets.push(newSetData);
+                        saveSets();
+                    }
+                    // 🌟 NEW: 8과 데이터 추가
+                    if (!sets.find(set => set.title === newSetData8.title)) {
+                        sets.push(newSetData8);
+                        saveSets();
+                    }
+                } catch (e) {
+                    sets = [...initialData, newSetData, newSetData8]; // 🌟 8과 추가
+                    saveSets();
+                }
+            } else {
+                sets = [...initialData, newSetData, newSetData8]; // 🌟 8과 추가
+                saveSets();
+            }
+        }
+
+        function showScreen(screenName) { Object.values(screens).forEach(screen => screen.classList.add('hidden')); screens[screenName].classList.remove('hidden'); }
+        function saveSets() { localStorage.setItem('sentenceArrangementSets', JSON.stringify(sets)); }
+
+        function loadSets() { initializeSets(defaultData); }
+
+        function renderMainScreen() {
+            setList.innerHTML = '';
+            sets.forEach((set, index) => {
+                const li = document.createElement('li');
+                li.className = 'set-item';
+                li.dataset.index = index;
+                // 🌟 수정: 오답 학습 버튼 클래스를 btn-warning에서 btn-light-primary로 변경
+                li.innerHTML = `
+                    <span class="set-item-title">${set.title}</span>
+                    <div class="set-item-controls">
+                        <button class="btn btn-primary start-btn">학습 시작</button>
+                        <button class="btn btn-light-primary wrong-answer-btn">오답 학습</button>
+                        <button class="btn report-btn">리포트</button>
+                        <button class="btn btn-danger delete-btn">삭제</button>
+                    </div>`;
+                setList.appendChild(li);
+            });
+        }
+        function addSentenceInputField(sentence = '', meaning = '') {
+            const div = document.createElement('div');
+            div.className = 'sentence-pair';
+            div.innerHTML = `<input type="text" class="sentence-input" placeholder="문장" value="${sentence}"><input type="text" class="meaning-input" placeholder="뜻" value="${meaning}">`;
+            sentenceInputsContainer.appendChild(div);
+        }
+        function handleSaveSet() {
+            const title = setTitleInput.value.trim(); if (!title) return alert('세트 제목을 입력해주세요.');
+            const newSentences = [];
+            sentenceInputsContainer.querySelectorAll('.sentence-pair').forEach(p => { const s = p.querySelector('.sentence-input').value.trim(); const m = p.querySelector('.meaning-input').value.trim(); if (s && m) newSentences.push({ sentence: s, meaning: m }); });
+            if (newSentences.length === 0) return alert('하나 이상의 문장을 추가해주세요.');
+            sets.push({ id: Date.now(), title: title, sentences: newSentences, report: {} });
+            saveSets(); renderMainScreen(); showScreen('main');
+        }
+
+        function startLearning(setIndex, numQuestions, mode = 'random') {
+            currentSetIndex = setIndex;
+            currentQuestionIndex = 0;
+            const currentSet = sets[currentSetIndex];
+            if (!currentSet) { console.error("Error: Invalid setIndex", setIndex); return; }
+
+            let sentencesToLearn = [...currentSet.sentences];
+            
+            if (mode === 'random') {
+                sentencesToLearn.sort(() => 0.5 - Math.random());
+            } 
+
+            currentSessionSentences = sentencesToLearn.slice(0, numQuestions);
+
+            learningSetTitle.textContent = currentSet.title;
+            renderQuestion();
+            showScreen('learning');
+        }
+
+        function startWrongAnswerLearning(setIndex) {
+            currentSetIndex = setIndex;
+            currentQuestionIndex = 0;
+            const currentSet = sets[currentSetIndex];
+            if (!currentSet) { console.error("Error: Invalid setIndex", setIndex); return; }
+
+            const reportData = currentSet.report || {};
+            
+            const wrongSentences = Object.keys(reportData)
+                .map(sentence => ({
+                    sentence: sentence,
+                    count: reportData[sentence]
+                }))
+                .filter(item => item.count > 0)
+                .sort((a, b) => b.count - a.count)
+                .slice(0, 10); 
+
+            if (wrongSentences.length === 0) {
+                alert('오답 기록이 없거나 1회 이상 틀린 문장이 없습니다. 일반 학습을 이용해 주세요.');
+                return;
+            }
+
+            currentSessionSentences = wrongSentences.map(item => {
+                const fullSentence = currentSet.sentences.find(s => s.sentence === item.sentence);
+                return fullSentence || { sentence: item.sentence, meaning: '뜻 정보 없음 (원본 문장 삭제됨)' };
+            }).filter(s => s.meaning !== '뜻 정보 없음 (원본 문장 삭제됨)'); 
+
+            if (currentSessionSentences.length === 0) {
+                alert('오답 문장에 대한 원본 정보가 세트에서 발견되지 않았습니다. 일반 학습을 이용해 주세요.');
+                return;
+            }
+
+            learningSetTitle.textContent = `${currentSet.title} (오답 학습 - ${currentSessionSentences.length}개)`;
+            renderQuestion();
+            showScreen('learning');
+        }
+
+
+        function renderQuestion() {
+            isFirstAttempt = true; feedbackArea.innerHTML = '';
+            checkBtn.classList.remove('hidden'); 
+            undoBtn.classList.remove('hidden');
+            showAnswerBtn.classList.add('hidden'); nextQuestionBtn.classList.add('hidden');
+            checkBtn.disabled = false;
+            // FIX: 다음 문제 시작 시 되돌리기 버튼을 강제로 활성화 (disabled 상태 초기화)
+            undoBtn.disabled = false; 
+
+            const question = currentSessionSentences[currentQuestionIndex];
+            progressDisplay.textContent = `${currentQuestionIndex + 1} / ${currentSessionSentences.length}`;
+            meaningDisplay.textContent = question.meaning;
+            
+            currentSentenceWords = splitSentenceIntoWords(question.sentence);
+            
+            const shuffledWords = [...currentSentenceWords].sort(() => 0.5 - Math.random());
+            
+            arrangementArea.innerHTML = '';
+            wordBank.innerHTML = '';
+            
+            shuffledWords.forEach((word, index) => {
+                const wordBtn = document.createElement('button');
+                wordBtn.textContent = word;
+                wordBtn.className = 'word-btn';
+                wordBtn.dataset.originalIndex = index;
+                wordBtn.addEventListener('click', () => {
+                    // 정답이 공개된 상태가 아니라면 단어를 배열할 수 있음
+                    if (checkBtn.disabled && showAnswerBtn.classList.contains('hidden')) return; 
+                    arrangeWord(wordBtn);
+                });
+                wordBank.appendChild(wordBtn);
+            });
+        }
+        
+        function arrangeWord(wordBtn) {
+            wordBtn.disabled = true;
+            const arrangedWord = document.createElement('span');
+            arrangedWord.textContent = wordBtn.textContent;
+            arrangedWord.className = 'arranged-word';
+            arrangedWord.dataset.originalIndex = wordBtn.dataset.originalIndex;
+            arrangedWord.dataset.source = 'word-bank'; 
+
+            arrangedWord.addEventListener('click', () => {
+                // 배열된 단어를 클릭해서 되돌리기 하는 기능은 현재 허용하지 않음
+            });
+            
+            arrangementArea.appendChild(arrangedWord);
+        }
+
+        function handleUndo() {
+            // 되돌리기 버튼 자체가 비활성화되어 있다면 (정답 후 등) 실행하지 않음
+            if(undoBtn.disabled) return; 
+
+            const arrangedWords = arrangementArea.querySelectorAll('.arranged-word');
+            if (arrangedWords.length > 0) {
+                const lastWord = arrangedWords[arrangedWords.length - 1];
+                const originalIndex = lastWord.dataset.originalIndex;
+                
+                // 1. 배열 영역에서 단어 삭제
+                arrangementArea.removeChild(lastWord);
+                
+                // 2. Word Bank에서 해당 버튼 활성화 (회색 -> 원래 색상)
+                const sourceButton = wordBank.querySelector(`[data-original-index="${originalIndex}"]`);
+                if (sourceButton) {
+                    sourceButton.disabled = false;
+                }
+            }
+        }
+
+        function handleCheck() {
+            const set = sets[currentSetIndex];
+            const question = currentSessionSentences[currentQuestionIndex];
+            const arrangedWords = Array.from(arrangementArea.querySelectorAll('.arranged-word')).map(span => span.textContent);
+            
+            const correctSentence = currentSentenceWords.join(' ');
+            const userSentence = arrangedWords.join(' ');
+            
+            feedbackArea.innerHTML = '';
+            
+            if (userSentence === correctSentence) {
+                // 🌟 정답인 경우: 모든 상호작용 비활성화 및 다음 단계로 이동
+
+                // 1. 상호작용 비활성화 (정답일 때만)
+                checkBtn.disabled = true;
+                wordBank.querySelectorAll('.word-btn').forEach(btn => btn.disabled = true);
+                arrangementArea.querySelectorAll('.arranged-word').forEach(span => span.style.cursor = 'default');
+
+                // 2. UI 전환 (정답)
+                feedbackArea.innerHTML = '<p class="feedback correct">🎉 정답입니다!</p>';
+                checkBtn.classList.add('hidden'); 
+                undoBtn.classList.add('hidden'); 
+                undoBtn.disabled = true;
+                showAnswerBtn.classList.add('hidden'); 
+                nextQuestionBtn.classList.remove('hidden');
+            } else {
+                // 🌟 오답인 경우: 리포트 기록 및 재시도/다음 버튼 활성화 (계속 채점 가능)
+
+                // 1. 오답 리포트 기록 (첫 시도에만)
+                if (isFirstAttempt) { 
+                    if (!set.report) set.report = {}; 
+                    set.report[question.sentence] = (set.report[question.sentence] || 0) + 1; 
+                    saveSets(); 
+                    isFirstAttempt = false; 
+                }
+                
+                // 2. UI 전환 (오답: 재시도/다음 버튼 활성화)
+                feedbackArea.innerHTML = '<p class="feedback incorrect">❌ 순서가 틀렸습니다. 다시 확인하고 재배열하거나, 다음 문항으로 넘어갈 수 있습니다.</p>';
+                
+                checkBtn.classList.remove('hidden'); 
+                checkBtn.disabled = false; // **핵심 수정 사항: 다시 채점할 수 있게 활성화**
+                
+                showAnswerBtn.classList.add('hidden'); // 정답 보기는 숨김
+                nextQuestionBtn.classList.remove('hidden'); // **핵심 수정 사항: 다음 버튼 활성화**
+                
+                undoBtn.classList.remove('hidden'); 
+                undoBtn.disabled = false; 
+                
+                // 단어 클릭 상호작용은 계속 유지됨.
+            }
+        }
+        
+        function handleShowAnswer() {
+            // 이 버튼은 이제 오답 후 재시도 옵션이 활성화되어 사용되지 않지만, 혹시 모를 로직을 위해 유지
+            feedbackArea.innerHTML = `<p class="correct-sentence-display">정답: <strong>${currentSentenceWords.join(' ')}</strong></p>`;
+            showAnswerBtn.classList.add('hidden'); 
+            undoBtn.classList.add('hidden');
+            undoBtn.disabled = true;
+            nextQuestionBtn.classList.remove('hidden');
+        }
+
+        function handleNext() {
+            currentQuestionIndex++;
+            if (currentQuestionIndex < currentSessionSentences.length) {
+                renderQuestion();
+            } else {
+                alert('학습 세트를 완료했습니다!');
+                showScreen('main');
+            }
+        }
+        function renderReport(setIndex) {
+            const set = sets[setIndex]; reportTitle.textContent = `"${set.title}" 리포트`; reportList.innerHTML = '';
+            const reportData = set.report || {};
+            
+            const sortedReport = Object.keys(reportData)
+                .map(sentence => ({
+                    sentence: sentence,
+                    count: reportData[sentence]
+                }))
+                .filter(item => item.count > 0)
+                .sort((a, b) => b.count - a.count);
+
+            if (sortedReport.length === 0) { 
+                reportList.innerHTML = '<li>틀린 문장이 없습니다. 훌륭해요!</li>'; 
+            } else { 
+                sortedReport.forEach(item => { 
+                    const li = document.createElement('li'); 
+                    li.innerHTML = `<p class="report-sentence">${item.sentence}</p><p class="report-count">${item.count}번 틀림</p>`; 
+                    reportList.appendChild(li); 
+                }); 
+            }
+            showScreen('report');
+        }
+
+        // --- 이벤트 리스너 ---
+        addSetBtn.addEventListener('click', () => { setTitleInput.value = ''; sentenceInputsContainer.innerHTML = ''; addSentenceInputField(); addSentenceInputField(); showScreen('create'); });
+        backToMainBtns.forEach(btn => btn.addEventListener('click', () => { renderMainScreen(); showScreen('main'); }));
+        addSentenceFieldBtn.addEventListener('click', () => addSentenceInputField());
+        saveSetBtn.addEventListener('click', handleSaveSet);
+        
+        setList.addEventListener('click', (e) => {
+            const targetButton = e.target.closest('.btn');
+            if (!targetButton) return;
+            const li = targetButton.closest('.set-item');
+            if (!li) return;
+            const index = parseInt(li.dataset.index);
+
+            if (targetButton.classList.contains('start-btn')) {
+                const set = sets[index];
+                if (!set.sentences || set.sentences.length === 0) {
+                    alert('학습할 문장이 없습니다.');
+                    return;
+                }
+                const maxCount = set.sentences.length;
+                
+                // 모드 선택 로직
+                const modeInput = prompt("학습 모드를 선택하세요. (1: 순서대로, 2: 랜덤)", "2");
+                if (modeInput === null) return;
+                
+                let mode;
+                if (modeInput === '1') {
+                    mode = 'original';
+                } else if (modeInput === '2') {
+                    mode = 'random';
+                } else {
+                    alert('잘못된 모드 선택입니다. 랜덤 모드로 시작합니다.');
+                    mode = 'random';
+                }
+
+                const userInput = prompt(`학습할 문장 개수를 입력하세요. (최대 ${maxCount}개)`, maxCount);
+                
+                if (userInput === null) return;
+
+                const numQuestions = parseInt(userInput);
+                
+                if (isNaN(numQuestions) || numQuestions <= 0) {
+                    alert('올바른 숫자를 입력해주세요.');
+                    return;
+                }
+                
+                startLearning(index, Math.min(numQuestions, maxCount), mode); 
+            
+            } else if (targetButton.classList.contains('wrong-answer-btn')) {
+                startWrongAnswerLearning(index);
+            
+            } else if (targetButton.classList.contains('report-btn')) {
+                renderReport(index);
+            } else if (targetButton.classList.contains('delete-btn')) {
+                if (confirm(`'${sets[index].title}' 세트를 정말 삭제하시겠습니까?`)) {
+                    sets.splice(index, 1);
+                    saveSets();
+                    renderMainScreen();
+                }
+            }
+        });
+
+        checkBtn.addEventListener('click', handleCheck);
+        undoBtn.addEventListener('click', handleUndo); 
+        showAnswerBtn.addEventListener('click', handleShowAnswer);
+        nextQuestionBtn.addEventListener('click', handleNext);
+
+        loadSets();
+        renderMainScreen();
+        showScreen('main');
+    });
+    </script>
+</body>
+</html>
